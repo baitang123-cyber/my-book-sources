@@ -1,16 +1,1 @@
-[
-  {
-    "id": "legado_official_3000",
-    "name": "Legado官方优质源",
-    "url": "https://raw.githubusercontent.com/gedoor/legado/main/app/src/main/assets/booksources/3000.json",
-    "type": "novel",
-    "status": "active"
-  },
-  {
-    "id": "community_booksource_1",
-    "name": "社区精选开源源",
-    "url": "https://raw.githubusercontent.com/aoaow/BookSource/master/booksource_1.json",
-    "type": "novel",
-    "status": "active"
-  }
-]
+[]
