@@ -1,18 +1,7 @@
 {
-  "version": "1.0.0",
-  "updateTime": "2026-02-02 00:00:00",
+  "version": "1.0.1",
+  "updateTime": "2026-02-02 07:27:47",
   "author": "baitang123-cyber",
   "description": "开源阅读App聚合源，每6小时自动更新",
-  "sources": [
-    {
-      "id": "source_001",
-      "name": "测试源1",
-      "url": "https://raw.githubusercontent.com/baitang123-cyber/reading-sources-aggregate/main/demo-source.json",
-      "type": "novel",
-      "status": "active",
-      "score": 10.0,
-      "updateTime": "2026-02-02 00:00:00"
-    }
-  ]
+  "sources": []
 }
-
