@@ -43,7 +43,7 @@ jobs:
               data = {
                   "version": "1.0.0",
                   "updateTime": "",
-                  "author": "你的GitHub用户名",  # 替换为你的GitHub用户名
+                  "author": "baitang123-cyber",  # 替换为你的GitHub用户名
                   "description": "开源阅读App聚合源，每6小时自动更新",
                   "sources": []
               }
