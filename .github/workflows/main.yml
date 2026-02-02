@@ -1,0 +1,81 @@
+name: 自动更新阅读聚合源
+on:
+  schedule:
+    - cron: "0 */6 * * *"  # 每6小时自动更新一次（UTC时间，国内对应+8小时）
+  workflow_dispatch:  # 支持手动点击更新
+
+jobs:
+  update-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取仓库代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: 安装Python环境
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 安装依赖工具
+        run: |
+          python -m pip install requests
+
+      - name: 运行自动更新脚本
+        run: |
+          cat > update.py << 'EOF'
+          import json
+          import datetime
+          import requests
+
+          # 配置项
+          SOURCE_FILE = "book-sources.json"
+          CHECK_TIMEOUT = 10
+
+          # 读取现有源文件
+          try:
+              with open(SOURCE_FILE, "r", encoding="utf-8") as f:
+                  data = json.load(f)
+          except:
+              data = {
+                  "version": "1.0.0",
+                  "updateTime": "",
+                  "author": "baitang123-cyber",
+                  "description": "开源阅读App聚合源，每6小时自动更新",
+                  "sources": []
+              }
+
+          # 版本号自增
+          def update_version(v):
+              parts = v.split(".")
+              parts[2] = str(int(parts[2]) + 1)
+              return ".".join(parts)
+
+          # 校验源可用性
+          valid_sources = []
+          for s in data.get("sources", []):
+              try:
+                  res = requests.get(s["url"], timeout=CHECK_TIMEOUT)
+                  if res.status_code == 200:
+                      s["status"] = "active"
+                      valid_sources.append(s)
+              except:
+                  s["status"] = "expired"
+
+          # 更新数据
+          data["version"] = update_version(data["version"])
+          data["updateTime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+          data["sources"] = valid_sources
+
+          # 保存文件
+          with open(SOURCE_FILE, "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+          EOF
+          python update.py
+
+      - name: 提交更新后的文件
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "自动更新聚合源版本"
+          file_pattern: book-sources.json
