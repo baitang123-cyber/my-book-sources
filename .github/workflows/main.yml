@@ -8,12 +8,12 @@ jobs:
   update-sources:
     runs-on: ubuntu-latest
     steps:
-- name: 拉取仓库代码
-  uses: actions/checkout@v4
-  with:
-    fetch-depth: 1
-    persist-credentials: true  # 新增这一行：保留仓库凭证，赋予推送权限
-    
+      - name: 拉取仓库代码（带权限保留，解决403报错）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true  # 核心修复：保留仓库凭证，赋予推送权限
+
       - name: 安装Python环境
         uses: actions/setup-python@v5
         with:
@@ -21,7 +21,8 @@ jobs:
 
       - name: 安装依赖工具
         run: |
-          python -m pip install requests
+          python -m pip install --upgrade pip
+          pip install requests
 
       - name: 运行自动更新脚本
         run: |
@@ -42,41 +43,50 @@ jobs:
               data = {
                   "version": "1.0.0",
                   "updateTime": "",
-                  "author": "baitang123-cyber",
+                  "author": "你的GitHub用户名",  # 替换为你的GitHub用户名
                   "description": "开源阅读App聚合源，每6小时自动更新",
                   "sources": []
               }
 
-          # 版本号自增
+          # 版本号自增（补丁版本）
           def update_version(v):
-              parts = v.split(".")
-              parts[2] = str(int(parts[2]) + 1)
-              return ".".join(parts)
+              try:
+                  parts = v.split(".")
+                  if len(parts) != 3:
+                      return "1.0.1"
+                  parts[2] = str(int(parts[2]) + 1)
+                  return ".".join(parts)
+              except:
+                  return "1.0.1"
 
-          # 校验源可用性
+          # 校验源可用性，剔除失效源
           valid_sources = []
           for s in data.get("sources", []):
               try:
-                  res = requests.get(s["url"], timeout=CHECK_TIMEOUT)
+                  # 发送请求校验源是否可用
+                  res = requests.get(s.get("url", ""), timeout=CHECK_TIMEOUT)
                   if res.status_code == 200:
                       s["status"] = "active"
                       valid_sources.append(s)
-              except:
+              except Exception as e:
+                  print(f"源 {s.get('name', '未知源')} 失效：{str(e)}")
                   s["status"] = "expired"
 
-          # 更新数据
-          data["version"] = update_version(data["version"])
+          # 更新聚合源核心数据
+          data["version"] = update_version(data.get("version", "1.0.0"))
           data["updateTime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
           data["sources"] = valid_sources
 
-          # 保存文件
+          # 保存更新后的文件（UTF-8编码，保证中文正常显示）
           with open(SOURCE_FILE, "w", encoding="utf-8") as f:
               json.dump(data, f, ensure_ascii=False, indent=2)
           EOF
           python update.py
 
-      - name: 提交更新后的文件
+      - name: 提交并推送更新后的文件
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "自动更新聚合源版本"
+          commit_message: "自动更新聚合源：${{ github.sha }}（版本号自动递增）"
           file_pattern: book-sources.json
+          commit_user_name: github-actions[bot]
+          commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
