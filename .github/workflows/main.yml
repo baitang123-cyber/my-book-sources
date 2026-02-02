@@ -14,6 +14,12 @@ jobs:
           fetch-depth: 1
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
+      - name: 拉取远程最新代码，解决分支分歧
+        run: |
+          git pull origin main --rebase
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
       - name: 安装Python环境
         uses: actions/setup-python@v5
         with:
@@ -24,67 +30,52 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests
 
-      - name: 运行自动更新脚本
+      - name: 运行自动更新脚本（输出纯书源数组，兼容App导入）
         run: |
           cat > update.py << 'EOF'
           import json
-          import datetime
           import requests
 
+          # 配置项
           SOURCE_FILE = "book-sources.json"
           CHECK_TIMEOUT = 10
 
-          # 读取现有源文件
+          # 1. 读取现有文件，确保是纯数组格式
           try:
               with open(SOURCE_FILE, "r", encoding="utf-8") as f:
-                  data = json.load(f)
-          except:
-              data = {
-                  "version": "1.0.0",
-                  "updateTime": "",
-                  "author": "baitang123-cyber",
-                  "description": "开源阅读App聚合源，每6小时自动更新",
-                  "sources": []
-              }
+                  sources = json.load(f)
+              # 容错：如果读取到的是对象，转为空数组（避免格式错误）
+              if not isinstance(sources, list):
+                  sources = []
+          except Exception as e:
+              print(f"读取文件失败，初始化空数组：{e}")
+              sources = []
 
-          # 版本号自增
-          def update_version(v):
-              try:
-                  parts = v.split(".")
-                  if len(parts) != 3:
-                      return "1.0.1"
-                  parts[2] = str(int(parts[2]) + 1)
-                  return ".".join(parts)
-              except:
-                  return "1.0.1"
-
-          # 校验源可用性
+          # 2. 校验每个源的可用性，只保留有效源
           valid_sources = []
-          for s in data.get("sources", []):
+          for s in sources:
               try:
+                  # 发送请求校验源地址是否可用
                   res = requests.get(s.get("url", ""), timeout=CHECK_TIMEOUT)
                   if res.status_code == 200:
-                      s["status"] = "active"
+                      s["status"] = "active"  # 标记为有效源
                       valid_sources.append(s)
+                      print(f"源 {s.get('name', '未知源')} 可用，保留")
               except Exception as e:
-                  print(f"源 {s.get('name','未知源')} 失效：{e}")
-                  s["status"] = "expired"
+                  print(f"源 {s.get('name', '未知源')} 失效，剔除：{e}")
 
-          # 更新信息
-          data["version"] = update_version(data.get("version", "1.0.0"))
-          data["updateTime"] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-          data["sources"] = valid_sources
-
-          # 写回文件
+          # 3. 保存为纯JSON数组格式（App可直接解析导入）
           with open(SOURCE_FILE, "w", encoding="utf-8") as f:
-              json.dump(data, f, ensure_ascii=False, indent=2)
+              json.dump(valid_sources, f, ensure_ascii=False, indent=2)
+          print(f"更新完成，有效源数量：{len(valid_sources)}")
           EOF
           python update.py
 
       - name: 提交并推送更新
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "自动更新聚合源：${{ github.sha }}（版本号自动递增）"
+          commit_message: "自动更新聚合源：保留有效源（纯数组格式，兼容App导入）"
           file_pattern: book-sources.json
           commit_user_name: github-actions[bot]
           commit_user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          push_options: "--force-with-lease"
